@@ -89,41 +89,89 @@ const VietnamProvincesLookup = () => {
     }
     setLoading(false);
   };
-
-  const loadProvinceDetail = async (province: ProvinceData) => {
-    setDetailLoading(true);
-    setDetailData([]);
-    setSelectedItem(null);
+  function simpleDeobfuscate(obfuscatedData: string): any {
+  try {
+    const decoded = atob(obfuscatedData);
     
-    try {
-      if (province.has_detail) {
-        const fileName = province.short_code.toLowerCase();
-        const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
+    // XOR với key đơn giản
+    const key = 'secretkey123';
+    const deobfuscated = decoded.split('').map((char, index) => {
+      const keyChar = key[index % key.length];
+      return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
+    }).join('');
+    
+    const jsonString = atob(deobfuscated);
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('Deobfuscation failed:', error);
+    return null;
+  }
+}
+async function generateSimpleToken(timestamp: number): Promise<string> {
+  const secret = 'your-secret-here'; // Phải giống với server
+  const message = timestamp + secret;
+  
+  // Simple hash function using crypto.subtle API
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return hashHex;
+}
+  const loadProvinceDetail = async (province: ProvinceData) => {
+  setDetailLoading(true);
+  setDetailData([]);
+  setSelectedItem(null);
+  
+  try {
+    if (province.has_detail) {
+      const fileName = province.short_code.toLowerCase();
+      const timestamp = Date.now();
+      const token = await generateSimpleToken(timestamp);
+      
+      const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Token': token,
+          'X-Time': timestamp.toString()
+        }
+      });
+      
+      if (!response.ok) {
+        console.warn(`File not found: /api/provinces/${fileName} (${response.status})`);
+        setDetailData([]);
+      } else {
+        const result = await response.json();
         
-        if (!response.ok) {
-          console.warn(`File not found: /api/provinces/${fileName} (${response.status})`);
-          setDetailData([]);
-        } else {
-          const jsonData = await response.json();
-          if (Array.isArray(jsonData)) {
-            setDetailData(jsonData);
+        // Kiểm tra response format từ API bảo mật
+        if (result.status === 'ok' && result.payload) {
+          // Deobfuscate data
+          const deobfuscatedData = simpleDeobfuscate(result.payload);
+          
+          if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
+            setDetailData(deobfuscatedData);
           } else {
-            console.warn('Unexpected data format:', jsonData);
+            console.warn('Failed to deobfuscate data');
             setDetailData([]);
           }
+        } else if (Array.isArray(result)) {
+          // Fallback cho API cũ (nếu chưa update API)
+          setDetailData(result);
+        } else {
+          console.warn('Unexpected response format:', result);
+          setDetailData([]);
         }
       }
-    } catch (error) {
-      console.error('Error loading province detail:', error);
-      setDetailData([]);
     }
-    setDetailLoading(false);
-  };
+  } catch (error) {
+    console.error('Error loading province detail:', error);
+    setDetailData([]);
+  }
+  setDetailLoading(false);
+};
 
   const handleProvinceClick = (province: ProvinceData) => {
     if (province.has_detail && province.merger_type === "Có sáp nhập") {
