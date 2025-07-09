@@ -129,7 +129,7 @@ const VietnamProvincesLookup = () => {
   }
 }
 async function generateSimpleToken(timestamp: number): Promise<string> {
-  const secret = 'your-secret-here'; // Phải giống với server
+  const secret = 'secretkey123'; // Phải giống với server
   const message = timestamp + secret;
   
   // Simple hash function using crypto.subtle API
