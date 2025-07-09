@@ -92,41 +92,62 @@ const VietnamProvincesLookup = () => {
   };
 
   const loadProvinceDetail = async (province: ProvinceData) => {
-    setDetailLoading(true);
-    setDetailData([]);
-    setSelectedItem(null);
-    
-    try {
-      if (province.has_detail) {
-        let jsonData: LocationItem[] = [];
-        // Import JSON từ thư mục src/data
-        if (province.short_code === "VLG" || province.name.includes("Vĩnh Long")) {
-          const response = await fetch('/data/vinhlong.json');
-          jsonData = await response.json();
-        } else if (province.short_code === "CTO" || province.name.includes("Cần Thơ")) {
-          const response = await fetch('/data/cantho.json');
-          jsonData = await response.json();
-        } else if (province.short_code === "CMU" || province.name.includes("Cà Mau")) {
-          const response = await fetch('/data/camau.json');
-          jsonData = await response.json();
-        } else if (province.short_code === "AGG" || province.name.includes("An Giang")) {
-          const response = await fetch('/data/angiang.json');
-          jsonData = await response.json();
-        } else if (province.short_code === "DTP" || province.name.includes("Đồng Tháp")) {
-          const response = await fetch('/data/dongthap.json');
-          jsonData = await response.json();
+  setDetailLoading(true);
+  setDetailData([]);
+  setSelectedItem(null);
+  
+  try {
+    if (province.has_detail) {
+      let jsonData: LocationItem[] = [];
+      let fileName = '';
+      
+      // Xác định tên file JSON dựa trên mã tỉnh
+      if (province.short_code === "VLG" || province.name.includes("Vĩnh Long")) {
+        fileName = 'vinhlong.json';
+      } else if (province.short_code === "CTO" || province.name.includes("Cần Thơ")) {
+        fileName = 'cantho.json';
+      } else if (province.short_code === "CMU" || province.name.includes("Cà Mau")) {
+        fileName = 'camau.json';
+      } else if (province.short_code === "AGG" || province.name.includes("An Giang")) {
+        fileName = 'angiang.json';
+      } else if (province.short_code === "DTP" || province.name.includes("Đồng Tháp")) {
+        fileName = 'dongthap.json';
+      }
+      
+      if (fileName) {
+        const url = `${window.location.origin}/data/${fileName}`;
+        console.log('Fetching URL:', url); // Log URL tuyệt đối
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          console.warn(`Expected JSON but got: ${contentType}`);
+          const text = await response.text();
+          console.log('Response text:', text.substring(0, 200));
+          throw new Error('Response is not JSON');
+        }
+        
+        jsonData = await response.json();
+        
         if (Array.isArray(jsonData)) {
           setDetailData(jsonData);
+          console.log(`Loaded ${jsonData.length} items for ${province.name}`);
+        } else {
+          console.error('Data is not an array:', jsonData);
+          setDetailData([]);
         }
       }
-    } catch (error) {
-      console.error('Error loading province detail:', error);
-      setDetailData([]);
     }
-    setDetailLoading(false);
-  };
-
+  } catch (error) {
+    console.error('Error loading province detail:', error);
+    setDetailData([]);
+  }
+  setDetailLoading(false);
+};
   const handleProvinceClick = (province: ProvinceData) => {
     // Chỉ mở modal nếu tỉnh có dữ liệu chi tiết VÀ có sáp nhập
     if (province.has_detail && province.merger_type === "Có sáp nhập") {
