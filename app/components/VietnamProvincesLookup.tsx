@@ -91,15 +91,17 @@ const VietnamProvincesLookup = () => {
   };
   function simpleDeobfuscate(obfuscatedData: string): any {
   try {
-    const decoded = atob(obfuscatedData);
-    
-    // XOR với key đơn giản
+    // Step 1: Decode the outer Base64 layer
+    const firstDecode = atob(obfuscatedData);
+
+    // Step 2: Reverse the XOR operation with the same key
     const key = 'secretkey123';
-    const deobfuscated = decoded.split('').map((char, index) => {
+    const deobfuscated = firstDecode.split('').map((char, index) => {
       const keyChar = key[index % key.length];
       return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
     }).join('');
-    
+
+    // Step 3: Decode the inner Base64 to get the original JSON
     const jsonString = atob(deobfuscated);
     return JSON.parse(jsonString);
   } catch (error) {
