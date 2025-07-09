@@ -132,7 +132,7 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
   
   return hashHex;
 }
-  const loadProvinceDetail = async (province: ProvinceData) => {
+ const loadProvinceDetail = async (province: ProvinceData) => {
   setDetailLoading(true);
   setDetailData([]);
   setSelectedItem(null);
@@ -140,50 +140,95 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
   try {
     if (province.has_detail) {
       const fileName = province.short_code.toLowerCase();
+      
+      // Tạo timestamp và token nếu cần
       const timestamp = Date.now();
       const token = await generateSimpleToken(timestamp);
       
+      // Sửa lỗi 2: Expression of type '"X-Token"' can't be used to index type
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Referer': 'https://tra-cuu-tinh-thanh.vercel.app/',
+        'Origin': 'https://tra-cuu-tinh-thanh.vercel.app'
+      };
+      
+      // Thêm token nếu có
+      if (token) {
+        headers['X-Token'] = token;
+        headers['X-Time'] = timestamp.toString();
+      }
+      
+      console.log(`Đang gọi API: /api/provinces/${fileName}`);
+      
       const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Token': token,
-          'X-Time': timestamp.toString()
-        }
+        headers: headers,
+        credentials: 'omit' // Không gửi cookies
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        console.warn(`File not found: /api/provinces/${fileName} (${response.status})`);
-        setDetailData([]);
-      } else {
-        const result = await response.json();
-        
-        // Kiểm tra response format từ API bảo mật
-        if (result.status === 'ok' && result.payload) {
-          // Deobfuscate data
-          const deobfuscatedData = simpleDeobfuscate(result.payload);
-          
-          if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
-            setDetailData(deobfuscatedData);
-          } else {
-            console.warn('Failed to deobfuscate data');
-            setDetailData([]);
-          }
-        } else if (Array.isArray(result)) {
-          // Fallback cho API cũ (nếu chưa update API)
-          setDetailData(result);
+        if (response.status === 403) {
+          console.warn('Access denied - có thể do CORS hoặc domain không được phép');
+        } else if (response.status === 404) {
+          console.warn(`File not found: /api/provinces/${fileName}`);
         } else {
-          console.warn('Unexpected response format:', result);
+          console.warn(`API error: ${response.status} - ${response.statusText}`);
+        }
+        setDetailData([]);
+        return;
+      }
+      
+      const result = await response.json();
+      console.log('API Response:', result);
+      
+      // Xử lý response từ API bảo mật
+      if (result.status === 'ok' && result.payload) {
+        console.log('Đang giải mã dữ liệu...');
+        
+        // Giải mã dữ liệu
+        const deobfuscatedData = simpleDeobfuscate(result.payload);
+        
+        if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
+          console.log(`Đã tải thành công ${deobfuscatedData.length} records`);
+          setDetailData(deobfuscatedData);
+        } else {
+          console.warn('Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
           setDetailData([]);
         }
+      } else if (Array.isArray(result)) {
+        // Fallback cho API cũ (dữ liệu không mã hóa)
+        console.log('Sử dụng dữ liệu từ API cũ');
+        setDetailData(result);
+      } else {
+        console.warn('Unexpected response format:', result);
+        setDetailData([]);
       }
+    } else {
+      console.log('Province không có dữ liệu chi tiết');
+      setDetailData([]);
     }
   } catch (error) {
+    // Sửa lỗi 3: 'error' is of type 'unknown'
     console.error('Error loading province detail:', error);
+    
+    // Thông báo lỗi chi tiết hơn
+    if (error instanceof Error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error('Network error - có thể do CORS hoặc API không available');
+      } else if (error.name === 'SyntaxError') {
+        console.error('JSON parsing error - response không phải JSON hợp lệ');
+      }
+    }
+    
     setDetailData([]);
+  } finally {
+    setDetailLoading(false);
   }
-  setDetailLoading(false);
 };
+
 
   const handleProvinceClick = (province: ProvinceData) => {
     if (province.has_detail && province.merger_type === "Có sáp nhập") {
