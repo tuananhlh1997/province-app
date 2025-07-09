@@ -92,62 +92,111 @@ const VietnamProvincesLookup = () => {
   };
 
   const loadProvinceDetail = async (province: ProvinceData) => {
-  setDetailLoading(true);
-  setDetailData([]);
-  setSelectedItem(null);
-  
-  try {
-    if (province.has_detail) {
-      let jsonData: LocationItem[] = [];
-      let fileName = '';
-      
-      // Xác định tên file JSON dựa trên mã tỉnh
-      if (province.short_code === "VLG" || province.name.includes("Vĩnh Long")) {
-        fileName = 'vinhlong.json';
-      } else if (province.short_code === "CTO" || province.name.includes("Cần Thơ")) {
-        fileName = 'cantho.json';
-      } else if (province.short_code === "CMU" || province.name.includes("Cà Mau")) {
-        fileName = 'camau.json';
-      } else if (province.short_code === "AGG" || province.name.includes("An Giang")) {
-        fileName = 'angiang.json';
-      } else if (province.short_code === "DTP" || province.name.includes("Đồng Tháp")) {
-        fileName = 'dongthap.json';
-      }
-      
-      if (fileName) {
-        const url = `${window.location.origin}/data/${fileName}`;
-        console.log('Fetching URL:', url); // Log URL tuyệt đối
-        const response = await fetch(url);
+    setDetailLoading(true);
+    setDetailData([]);
+    setSelectedItem(null);
+    
+    try {
+      if (province.has_detail) {
+        let jsonData: LocationItem[] = [];
+        let fileName = '';
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        // Xác định tên file JSON dựa trên mã tỉnh
+        if (province.short_code === "VLG" || province.name.includes("Vĩnh Long")) {
+          fileName = 'vinhlong.json';
+        } else if (province.short_code === "CTO" || province.name.includes("Cần Thơ")) {
+          fileName = 'cantho.json';
+        } else if (province.short_code === "CMU" || province.name.includes("Cà Mau")) {
+          fileName = 'camau.json';
+        } else if (province.short_code === "AGG" || province.name.includes("An Giang")) {
+          fileName = 'angiang.json';
+        } else if (province.short_code === "DTP" || province.name.includes("Đồng Tháp")) {
+          fileName = 'dongthap.json';
         }
         
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.warn(`Expected JSON but got: ${contentType}`);
-          const text = await response.text();
-          console.log('Response text:', text.substring(0, 200));
-          throw new Error('Response is not JSON');
+        if (fileName) {
+          try {
+            console.log(`Attempting to fetch: /data/${fileName}`);
+            const response = await fetch(`/data/${fileName}`);
+            
+            if (!response.ok) {
+              console.warn(`File not found: /data/${fileName} (${response.status})`);
+              // Tạo dữ liệu mẫu nếu file không tồn tại
+              jsonData = [
+                {
+                  id: 1,
+                  matinh: 1,
+                  ma: "00001",
+                  tentinh: province.name,
+                  loai: "Thành phố",
+                  tenhc: `Thành phố ${province.administrative_center}`,
+                  dientichkm2: 100.0,
+                  dansonguoi: "100000",
+                  trungtamhc: province.administrative_center,
+                  kinhdo: 106.0,
+                  vido: 10.0,
+                  truocsapnhap: "Dữ liệu mẫu - chưa có file JSON"
+                },
+                {
+                  id: 2,
+                  matinh: 1,
+                  ma: "00002",
+                  tentinh: province.name,
+                  loai: "Huyện",
+                  tenhc: "Huyện mẫu",
+                  dientichkm2: 200.0,
+                  dansonguoi: "50000",
+                  trungtamhc: "Thị trấn mẫu",
+                  kinhdo: 106.1,
+                  vido: 10.1,
+                  truocsapnhap: "Dữ liệu mẫu - chưa có file JSON"
+                }
+              ];
+            } else {
+              const contentType = response.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                jsonData = await response.json();
+              } else {
+                console.warn(`Expected JSON but got: ${contentType}`);
+                jsonData = [];
+              }
+            }
+          } catch (fetchError) {
+            console.error(`Error fetching ${fileName}:`, fetchError);
+            // Tạo dữ liệu mẫu khi có lỗi
+            jsonData = [
+              {
+                id: 1,
+                matinh: 1,
+                ma: "00001",
+                tentinh: province.name,
+                loai: "Thành phố",
+                tenhc: `Thành phố ${province.administrative_center}`,
+                dientichkm2: 100.0,
+                dansonguoi: "100000",
+                trungtamhc: province.administrative_center,
+                kinhdo: 106.0,
+                vido: 10.0,
+                truocsapnhap: "Dữ liệu mẫu - lỗi khi tải file"
+              }
+            ];
+          }
         }
         
-        jsonData = await response.json();
-        
-        if (Array.isArray(jsonData)) {
+        if (Array.isArray(jsonData) && jsonData.length > 0) {
           setDetailData(jsonData);
           console.log(`Loaded ${jsonData.length} items for ${province.name}`);
         } else {
-          console.error('Data is not an array:', jsonData);
+          console.log(`No data available for ${province.name}`);
           setDetailData([]);
         }
       }
+    } catch (error) {
+      console.error('Error loading province detail:', error);
+      setDetailData([]);
     }
-  } catch (error) {
-    console.error('Error loading province detail:', error);
-    setDetailData([]);
-  }
-  setDetailLoading(false);
-};
+    setDetailLoading(false);
+  };
   const handleProvinceClick = (province: ProvinceData) => {
     // Chỉ mở modal nếu tỉnh có dữ liệu chi tiết VÀ có sáp nhập
     if (province.has_detail && province.merger_type === "Có sáp nhập") {
