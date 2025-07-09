@@ -89,33 +89,33 @@ const VietnamProvincesLookup = () => {
     }
     setLoading(false);
   };
-  function simpleDeobfuscate(obfuscatedData: string): any {
+ function simpleDeobfuscate(obfuscatedData: string): any {
   try {
-    console.log('Input payload:', obfuscatedData);
-    
-    // Step 1: Decode outer Base64
-    const firstDecode = atob(obfuscatedData);
-    console.log('After first Base64 decode:', firstDecode);
+    console.log('Bước 1 - Payload đầu vào:', obfuscatedData);
 
-    // Step 2: Reverse XOR with key
+    // Bước 1: Giải mã Base64 lần đầu
+    const firstDecode = atob(obfuscatedData);
+    console.log('Bước 2 - Sau khi giải mã Base64 lần 1:', firstDecode);
+
+    // Bước 2: Đảo ngược XOR với khóa
     const key = 'secretkey123';
     const deobfuscated = firstDecode.split('').map((char, index) => {
       const keyChar = key[index % key.length];
       return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
     }).join('');
-    console.log('After XOR reversal:', deobfuscated);
+    console.log('Bước 3 - Sau khi đảo ngược XOR:', deobfuscated);
 
-    // Step 3: Decode inner Base64
+    // Bước 3: Giải mã Base64 lần thứ hai
     const jsonString = atob(deobfuscated);
-    console.log('After second Base64 decode:', jsonString);
+    console.log('Bước 4 - Sau khi giải mã Base64 lần 2:', jsonString);
 
-    // Step 4: Parse JSON
+    // Bước 4: Phân tích JSON
     const parsedData = JSON.parse(jsonString);
-    console.log('Parsed JSON:', parsedData);
+    console.log('Bước 5 - JSON đã phân tích:', parsedData);
 
     return parsedData;
   } catch (error) {
-    console.error('Deobfuscation failed:', error);
+    console.error('Giải mã thất bại:', error);
     return null;
   }
 }
