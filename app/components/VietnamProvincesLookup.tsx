@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MapPin, Users, BarChart3, Building, X, ChevronRight, Map, TrendingUp, Eye, Database, Info, Grid3X3, List, Target, Filter, SortAsc, Calendar, Globe, Star } from 'lucide-react';
+import { Search, MapPin, Building, X, ChevronRight, TrendingUp, Database, Grid3X3, List, Target, Globe } from 'lucide-react';
 
 // Interface cho dữ liệu tỉnh thành từ API
 interface ProvinceData {
