@@ -89,13 +89,18 @@ const VietnamProvincesLookup = () => {
     }
     setLoading(false);
   };
- function simpleDeobfuscate(obfuscatedData: string): any {
+ function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
   try {
-    console.log('Bước 1 - Payload đầu vào:', obfuscatedData);
+    console.log('Bước 1 - Payload đầu vào:', obfuscatedData?.substring(0, 100) + '...');
+
+    if (!obfuscatedData || typeof obfuscatedData !== 'string') {
+      console.error('Invalid payload: không phải string hoặc null');
+      return null;
+    }
 
     // Bước 1: Giải mã Base64 lần đầu
     const firstDecode = atob(obfuscatedData);
-    console.log('Bước 2 - Sau khi giải mã Base64 lần 1:', firstDecode);
+    console.log('Bước 2 - Sau khi giải mã Base64 lần 1:', firstDecode.substring(0, 100) + '...');
 
     // Bước 2: Đảo ngược XOR với khóa
     const key = 'secretkey123';
@@ -103,19 +108,23 @@ const VietnamProvincesLookup = () => {
       const keyChar = key[index % key.length];
       return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
     }).join('');
-    console.log('Bước 3 - Sau khi đảo ngược XOR:', deobfuscated);
+    console.log('Bước 3 - Sau khi đảo ngược XOR:', deobfuscated.substring(0, 100) + '...');
 
     // Bước 3: Giải mã Base64 lần thứ hai
     const jsonString = atob(deobfuscated);
-    console.log('Bước 4 - Sau khi giải mã Base64 lần 2:', jsonString);
+    console.log('Bước 4 - Sau khi giải mã Base64 lần 2:', jsonString.substring(0, 100) + '...');
 
     // Bước 4: Phân tích JSON
     const parsedData = JSON.parse(jsonString);
-    console.log('Bước 5 - JSON đã phân tích:', parsedData);
+    console.log('Bước 5 - JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
 
     return parsedData;
   } catch (error) {
     console.error('Giải mã thất bại:', error);
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+    }
     return null;
   }
 }
@@ -182,7 +191,15 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
       }
       
       const result = await response.json();
-      console.log('API Response:', result);
+      console.log('API Response structure:', {
+        hasStatus: 'status' in result,
+        status: result.status,
+        hasPayload: 'payload' in result,
+        payloadType: typeof result.payload,
+        payloadLength: result.payload?.length,
+        isArray: Array.isArray(result),
+        keys: Object.keys(result)
+      });
       
       // Xử lý response từ API bảo mật
       if (result.status === 'ok' && result.payload) {
@@ -196,6 +213,8 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
           setDetailData(deobfuscatedData);
         } else {
           console.warn('Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
+          console.warn('Deobfuscated data type:', typeof deobfuscatedData);
+          console.warn('Deobfuscated data:', deobfuscatedData);
           setDetailData([]);
         }
       } else if (Array.isArray(result)) {
@@ -210,8 +229,7 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
       console.log('Province không có dữ liệu chi tiết');
       setDetailData([]);
     }
-  } catch (error) {
-    // Sửa lỗi 3: 'error' is of type 'unknown'
+  } catch (error: unknown) {
     console.error('Error loading province detail:', error);
     
     // Thông báo lỗi chi tiết hơn
@@ -228,6 +246,7 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
     setDetailLoading(false);
   }
 };
+
 
 
   const handleProvinceClick = (province: ProvinceData) => {
