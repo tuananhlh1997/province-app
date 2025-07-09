@@ -91,41 +91,39 @@ const VietnamProvincesLookup = () => {
   };
 
   const loadProvinceDetail = async (province: ProvinceData) => {
-  setDetailLoading(true);
-  setDetailData([]);
-  setSelectedItem(null);
-  
-  try {
-    if (province.has_detail) {
-      const fileName = province.short_code.toLowerCase();
-      const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Source': 'tra-cuu-app', // Custom header
-        },
-        credentials: 'include' // Nếu cần cookies
-      });
-      
-      if (!response.ok) {
-        console.warn(`File not found: /api/provinces/${fileName} (${response.status})`);
-        setDetailData([]);
-      } else {
-        const jsonData = await response.json();
-        if (Array.isArray(jsonData)) {
-          setDetailData(jsonData);
-        } else {
-          console.warn('Unexpected data format:', jsonData);
+    setDetailLoading(true);
+    setDetailData([]);
+    setSelectedItem(null);
+    
+    try {
+      if (province.has_detail) {
+        const fileName = province.short_code.toLowerCase();
+        const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!response.ok) {
+          console.warn(`File not found: /api/provinces/${fileName} (${response.status})`);
           setDetailData([]);
+        } else {
+          const jsonData = await response.json();
+          if (Array.isArray(jsonData)) {
+            setDetailData(jsonData);
+          } else {
+            console.warn('Unexpected data format:', jsonData);
+            setDetailData([]);
+          }
         }
       }
+    } catch (error) {
+      console.error('Error loading province detail:', error);
+      setDetailData([]);
     }
-  } catch (error) {
-    console.error('Error loading province detail:', error);
-    setDetailData([]);
-  }
-  setDetailLoading(false);
-};
+    setDetailLoading(false);
+  };
 
   const handleProvinceClick = (province: ProvinceData) => {
     if (province.has_detail && province.merger_type === "Có sáp nhập") {
