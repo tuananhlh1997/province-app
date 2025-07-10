@@ -111,7 +111,7 @@ const VietnamProvincesLookup = () => {
       console.log('✅ Sau khi giải mã Base64:', jsonString.substring(0, 100) + '...');
 
       console.log('📋 Bước 3 - Parse JSON...');
-      let parsedData: any;
+      let parsedData: unknown;
       try {
         parsedData = JSON.parse(jsonString);
       } catch (error) {
@@ -124,7 +124,7 @@ const VietnamProvincesLookup = () => {
 
       if (!isLocationItemArray(parsedData)) {
         console.error('❌ Parsed data does not match LocationItem interface');
-        console.error('📋 Sample data structure:', parsedData?.[0]);
+        console.error('📋 Sample data structure:', Array.isArray(parsedData) ? parsedData[0] : parsedData);
         return null;
       }
 
@@ -140,7 +140,7 @@ const VietnamProvincesLookup = () => {
     }
   }
 
-  function isLocationItemArray(data: any): data is LocationItem[] {
+  function isLocationItemArray(data: unknown): data is LocationItem[] {
     if (!Array.isArray(data)) {
       console.error('❌ Data is not an array');
       return false;
@@ -156,18 +156,20 @@ const VietnamProvincesLookup = () => {
     for (let i = 0; i < sampleSize; i++) {
       const item = data[i];
       if (
-        typeof item.id !== 'number' ||
-        typeof item.matinh !== 'number' ||
-        typeof item.ma !== 'string' ||
-        typeof item.tentinh !== 'string' ||
-        typeof item.loai !== 'string' ||
-        typeof item.tenhc !== 'string' ||
-        typeof item.dientichkm2 !== 'number' ||
-        typeof item.dansonguoi !== 'string' ||
-        typeof item.trungtamhc !== 'string' ||
-        typeof item.kinhdo !== 'number' ||
-        typeof item.vido !== 'number' ||
-        typeof item.truocsapnhap !== 'string'
+        !item ||
+        typeof item !== 'object' ||
+        typeof (item as LocationItem).id !== 'number' ||
+        typeof (item as LocationItem).matinh !== 'number' ||
+        typeof (item as LocationItem).ma !== 'string' ||
+        typeof (item as LocationItem).tentinh !== 'string' ||
+        typeof (item as LocationItem).loai !== 'string' ||
+        typeof (item as LocationItem).tenhc !== 'string' ||
+        typeof (item as LocationItem).dientichkm2 !== 'number' ||
+        typeof (item as LocationItem).dansonguoi !== 'string' ||
+        typeof (item as LocationItem).trungtamhc !== 'string' ||
+        typeof (item as LocationItem).kinhdo !== 'number' ||
+        typeof (item as LocationItem).vido !== 'number' ||
+        typeof (item as LocationItem).truocsapnhap !== 'string'
       ) {
         console.error(`❌ Item ${i} does not match LocationItem interface:`, item);
         return false;
@@ -879,3 +881,5 @@ const VietnamProvincesLookup = () => {
     </div>
   );
 };
+
+export default VietnamProvincesLookup;
