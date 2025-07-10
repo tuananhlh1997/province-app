@@ -115,6 +115,7 @@ const VietnamProvincesLookup = () => {
       return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
     }).join('');
     console.log('Bước 3 - Sau khi đảo ngược XOR:', deobfuscated.substring(0, 100) + '...');
+    console.log('Full XOR result:', deobfuscated);
 
     if (!isValidBase64(deobfuscated)) {
       console.error('XOR result is not valid Base64');
@@ -123,12 +124,13 @@ const VietnamProvincesLookup = () => {
 
     const jsonString = atob(deobfuscated);
     console.log('Bước 4 - Sau khi giải mã Base64 lần 2:', jsonString.substring(0, 100) + '...');
+    console.log('Full JSON string:', jsonString);
 
     const parsedData = JSON.parse(jsonString);
     console.log('Bước 5 - JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
 
-    if (!Array.isArray(parsedData)) {
-      console.error('Parsed data is not an array');
+    if (!isLocationItemArray(parsedData)) {
+      console.error('Parsed data does not match LocationItem interface');
       return null;
     }
 
@@ -141,6 +143,22 @@ const VietnamProvincesLookup = () => {
     }
     return null;
   }
+}
+function isLocationItemArray(data: any): data is LocationItem[] {
+  return Array.isArray(data) && data.every(item => 
+    typeof item.id === 'number' &&
+    typeof item.matinh === 'number' &&
+    typeof item.ma === 'string' &&
+    typeof item.tentinh === 'string' &&
+    typeof item.loai === 'string' &&
+    typeof item.tenhc === 'string' &&
+    typeof item.dientichkm2 === 'number' &&
+    typeof item.dansonguoi === 'string' &&
+    typeof item.trungtamhc === 'string' &&
+    typeof item.kinhdo === 'number' &&
+    typeof item.vido === 'number' &&
+    typeof item.truocsapnhap === 'string'
+  );
 }
 async function generateSimpleToken(timestamp: number): Promise<string> {
   const secret = 'secretkey123'; // Phải giống với server
@@ -159,103 +177,72 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
   setDetailLoading(true);
   setDetailData([]);
   setSelectedItem(null);
-  
+
   try {
     if (province.has_detail) {
       const fileName = province.short_code.toLowerCase();
-      
-      // Tạo timestamp và token nếu cần
       const timestamp = Date.now();
       const token = await generateSimpleToken(timestamp);
-      
-      // Sửa lỗi 2: Expression of type '"X-Token"' can't be used to index type
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Referer': 'https://tra-cuu-tinh-thanh.vercel.app/',
         'Origin': 'https://tra-cuu-tinh-thanh.vercel.app'
       };
-      
-      // Thêm token nếu có
+
       if (token) {
         headers['X-Token'] = token;
         headers['X-Time'] = timestamp.toString();
       }
-      
+
       console.log(`Đang gọi API: /api/provinces/${fileName}`);
-      
       const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
         method: 'GET',
         headers: headers,
-        credentials: 'omit' // Không gửi cookies
+        credentials: 'omit'
       });
-      
+
       console.log('Response status:', response.status);
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
+
       if (!response.ok) {
-        if (response.status === 403) {
-          console.warn('Access denied - có thể do CORS hoặc domain không được phép');
-        } else if (response.status === 404) {
-          console.warn(`File not found: /api/provinces/${fileName}`);
-        } else {
-          console.warn(`API error: ${response.status} - ${response.statusText}`);
-        }
+        console.error(`API error: ${response.status} - ${response.statusText}`);
         setDetailData([]);
         return;
       }
-      
+
       const result = await response.json();
-      console.log('API Response structure:', {
-        hasStatus: 'status' in result,
-        status: result.status,
-        hasPayload: 'payload' in result,
-        payloadType: typeof result.payload,
-        payloadLength: result.payload?.length,
-        isArray: Array.isArray(result),
-        keys: Object.keys(result)
-      });
-      
-      // Xử lý response từ API bảo mật
+      console.log('Full API response:', result);
+
       if (result.status === 'ok' && result.payload) {
         console.log('Đang giải mã dữ liệu...');
-        
-        // Giải mã dữ liệu
         const deobfuscatedData = simpleDeobfuscate(result.payload);
-        
         if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
           console.log(`Đã tải thành công ${deobfuscatedData.length} records`);
           setDetailData(deobfuscatedData);
         } else {
-          console.warn('Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
-          console.warn('Deobfuscated data type:', typeof deobfuscatedData);
-          console.warn('Deobfuscated data:', deobfuscatedData);
+          console.error('Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
           setDetailData([]);
+
+          // Display user-friendly error in UI
+          alert('Không thể tải dữ liệu chi tiết. Vui lòng thử lại sau.');
         }
       } else if (Array.isArray(result)) {
-        // Fallback cho API cũ (dữ liệu không mã hóa)
         console.log('Sử dụng dữ liệu từ API cũ');
         setDetailData(result);
       } else {
-        console.warn('Unexpected response format:', result);
+        console.error('Unexpected response format:', result);
         setDetailData([]);
+        alert('Định dạng dữ liệu từ API không hợp lệ.');
       }
     } else {
       console.log('Province không có dữ liệu chi tiết');
       setDetailData([]);
     }
-  } catch (error: unknown) {
+  } catch (error) {
     console.error('Error loading province detail:', error);
-    
-    // Thông báo lỗi chi tiết hơn
-    if (error instanceof Error) {
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        console.error('Network error - có thể do CORS hoặc API không available');
-      } else if (error.name === 'SyntaxError') {
-        console.error('JSON parsing error - response không phải JSON hợp lệ');
-      }
-    }
-    
     setDetailData([]);
+    alert('Lỗi khi tải dữ liệu chi tiết. Vui lòng kiểm tra kết nối mạng.');
   } finally {
     setDetailLoading(false);
   }
