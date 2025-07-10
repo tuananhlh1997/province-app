@@ -92,7 +92,9 @@ const VietnamProvincesLookup = () => {
 
   function isValidBase64(str: string): boolean {
     // Support standard and URL-safe Base64
-    return /^[A-Za-z0-9+/\-_=]*$/.test(str) && str.length % 4 === 0;
+    if (!str || str.length === 0) return false;
+    if (str.length % 4 !== 0) return false;
+    return /^[A-Za-z0-9+/]*={0,2}$/.test(str);
   }
 
   function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
@@ -120,7 +122,7 @@ const VietnamProvincesLookup = () => {
         return null;
       }
       
-      console.log('✅ Sau khi giải mã Base64 lần 1:', firstDecode.substring(0, 50) + '...');
+      console.log('✅ Sau khi giải mã Base64 lần 1 (length):', firstDecode.length);
 
       console.log('🔑 Bước 3 - Thực hiện XOR decode...');
       const key = 'secretkey123';
@@ -137,17 +139,28 @@ const VietnamProvincesLookup = () => {
       
       console.log('✅ Sau khi XOR decode:', deobfuscated.substring(0, 50) + '...');
 
-      // Validate second Base64
+      // Clean XOR result more thoroughly
       const cleanedXorResult = deobfuscated.replace(/[^A-Za-z0-9+/=]/g, '');
       if (!isValidBase64(cleanedXorResult)) {
         console.error('❌ XOR result is not valid Base64');
+        console.error('🔍 XOR result sample:', deobfuscated.substring(0, 100));
         return null;
       }
 
       console.log('🔓 Bước 4 - Giải mã Base64 lần 2...');
       let jsonString: string;
       try {
-        jsonString = atob(cleanedXorResult);
+        const binaryString = atob(cleanedXorResult);
+        
+        // Convert binary string to proper UTF-8
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Use TextDecoder for proper UTF-8 handling
+        const decoder = new TextDecoder('utf-8');
+        jsonString = decoder.decode(bytes);
       } catch (error) {
         console.error('❌ Second Base64 decode failed:', error);
         return null;
@@ -162,7 +175,16 @@ const VietnamProvincesLookup = () => {
       } catch (error) {
         console.error('❌ JSON parse failed:', error);
         console.error('📄 Raw JSON string (first 200 chars):', jsonString.substring(0, 200));
-        return null;
+        
+        // Try to fix common Unicode issues
+        try {
+          const fixedJsonString = jsonString.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+          parsedData = JSON.parse(fixedJsonString);
+          console.log('🔧 Fixed JSON with character cleanup');
+        } catch (fixError) {
+          console.error('❌ Even fixed JSON parse failed:', fixError.message);
+          return null;
+        }
       }
 
       console.log('✅ JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
@@ -477,7 +499,7 @@ const VietnamProvincesLookup = () => {
             
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-xs bg-gray-800 px-2 py-1 rounded">2025</span>
-              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.1</span>
+              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.2</span>
             </div>
           </div>
         </div>
@@ -925,7 +947,7 @@ const VietnamProvincesLookup = () => {
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-xs bg-gray-800 px-2 py-1 rounded">2025</span>
-              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.1</span>
+              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.2</span>
             </div>
           </div>
         </div>
