@@ -89,167 +89,247 @@ const VietnamProvincesLookup = () => {
     }
     setLoading(false);
   };
+
   function isValidBase64(str: string): boolean {
-  // Support standard and URL-safe Base64
-  return /^[A-Za-z0-9+/\-_=]+$/.test(str);
-}
- function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
-  try {
-    console.log('Bước 1 - Payload đầu vào:', obfuscatedData?.substring(0, 100) + '...');
-
-    if (!obfuscatedData || typeof obfuscatedData !== 'string') {
-      console.error('Invalid payload: không phải string hoặc null');
-      return null;
-    }
-
-    if (!isValidBase64(obfuscatedData)) {
-      console.error('Invalid Base64 string');
-      return null;
-    }
-
-    const firstDecode = atob(obfuscatedData);
-    console.log('Bước 2 - Sau khi giải mã Base64 lần 1:', firstDecode.substring(0, 100) + '...');
-
-    const key = 'secretkey123';
-    const deobfuscated = firstDecode.split('').map((char, index) => {
-      const keyChar = key[index % key.length];
-      return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
-    }).join('');
-    console.log('Bước 3 - Sau khi đảo ngược XOR:', deobfuscated.substring(0, 100) + '...');
-    console.log('Full XOR result:', deobfuscated);
-
-    if (!isValidBase64(deobfuscated)) {
-      console.error('XOR result is not valid Base64');
-      return null;
-    }
-
-    const jsonString = atob(deobfuscated);
-    console.log('Bước 4 - Sau khi giải mã Base64 lần 2:', jsonString.substring(0, 100) + '...');
-    console.log('Full JSON string:', jsonString);
-
-    const parsedData = JSON.parse(jsonString);
-    console.log('Bước 5 - JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
-
-    if (!isLocationItemArray(parsedData)) {
-      console.error('Parsed data does not match LocationItem interface');
-      return null;
-    }
-
-    return parsedData;
-  } catch (error) {
-    console.error('Giải mã thất bại:', error);
-    if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-    }
-    return null;
+    // Support standard and URL-safe Base64
+    return /^[A-Za-z0-9+/\-_=]*$/.test(str) && str.length % 4 === 0;
   }
-}
-function isLocationItemArray(data: any): data is LocationItem[] {
-  return Array.isArray(data) && data.every(item => 
-    typeof item.id === 'number' &&
-    typeof item.matinh === 'number' &&
-    typeof item.ma === 'string' &&
-    typeof item.tentinh === 'string' &&
-    typeof item.loai === 'string' &&
-    typeof item.tenhc === 'string' &&
-    typeof item.dientichkm2 === 'number' &&
-    typeof item.dansonguoi === 'string' &&
-    typeof item.trungtamhc === 'string' &&
-    typeof item.kinhdo === 'number' &&
-    typeof item.vido === 'number' &&
-    typeof item.truocsapnhap === 'string'
-  );
-}
-async function generateSimpleToken(timestamp: number): Promise<string> {
-  const secret = 'secretkey123'; // Phải giống với server
-  const message = timestamp + secret;
-  
-  // Simple hash function using crypto.subtle API
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  return hashHex;
-}
-const loadProvinceDetail = async (province: ProvinceData) => {
-  setDetailLoading(true);
-  setDetailData([]);
-  setSelectedItem(null);
 
-  try {
-    if (province.has_detail) {
-      const fileName = province.short_code.toLowerCase();
-      const timestamp = Date.now();
-      const token = await generateSimpleToken(timestamp);
+  function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
+    try {
+      console.log('🔍 Bước 1 - Payload đầu vào:', obfuscatedData?.substring(0, 100) + '...');
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Referer': 'https://tra-cuu-tinh-thanh.vercel.app/',
-        'Origin': 'https://tra-cuu-tinh-thanh.vercel.app'
-      };
-
-      if (token) {
-        headers['X-Token'] = token;
-        headers['X-Time'] = timestamp.toString();
+      if (!obfuscatedData || typeof obfuscatedData !== 'string') {
+        console.error('❌ Invalid payload: không phải string hoặc null');
+        return null;
       }
 
-      console.log(`Đang gọi API: /api/provinces/${fileName}`);
-      const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
-        method: 'GET',
-        headers: headers,
-        credentials: 'omit'
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        console.error(`API error: ${response.status} - ${response.statusText}`);
-        setDetailData([]);
-        alert('Lỗi khi tải dữ liệu từ API. Vui lòng thử lại sau.');
-        return;
+      // Validate Base64 format
+      const cleanedPayload = obfuscatedData.replace(/[^A-Za-z0-9+/=]/g, '');
+      if (!isValidBase64(cleanedPayload)) {
+        console.error('❌ Invalid Base64 string format');
+        return null;
       }
 
-      const result = await response.json();
-      console.log('Full API response:', result);
-      console.log('API payload:', result.payload?.substring(0, 200) + '...');
-
-      if (result.status === 'ok' && result.payload) {
-        console.log('Đang giải mã dữ liệu...');
-        const deobfuscatedData = simpleDeobfuscate(result.payload);
-        if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
-          console.log(`Đã tải thành công ${deobfuscatedData.length} records`);
-          setDetailData(deobfuscatedData);
-        } else {
-          console.error('Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
-          setDetailData([]);
-          alert('Không thể giải mã dữ liệu chi tiết. Vui lòng thử lại sau.');
-        }
-      } else if (Array.isArray(result)) {
-        console.log('Sử dụng dữ liệu từ API cũ');
-        setDetailData(result);
-      } else {
-        console.error('Unexpected response format:', result);
-        setDetailData([]);
-        alert('Định dạng dữ liệu từ API không hợp lệ.');
+      console.log('🔓 Bước 2 - Giải mã Base64 lần 1...');
+      let firstDecode: string;
+      try {
+        firstDecode = atob(cleanedPayload);
+      } catch (error) {
+        console.error('❌ Base64 decode failed:', error);
+        return null;
       }
-    } else {
-      console.log('Province không có dữ liệu chi tiết');
-      setDetailData([]);
+      
+      console.log('✅ Sau khi giải mã Base64 lần 1:', firstDecode.substring(0, 50) + '...');
+
+      console.log('🔑 Bước 3 - Thực hiện XOR decode...');
+      const key = 'secretkey123';
+      let deobfuscated: string;
+      try {
+        deobfuscated = firstDecode.split('').map((char, index) => {
+          const keyChar = key[index % key.length];
+          return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
+        }).join('');
+      } catch (error) {
+        console.error('❌ XOR decode failed:', error);
+        return null;
+      }
+      
+      console.log('✅ Sau khi XOR decode:', deobfuscated.substring(0, 50) + '...');
+
+      // Validate second Base64
+      const cleanedXorResult = deobfuscated.replace(/[^A-Za-z0-9+/=]/g, '');
+      if (!isValidBase64(cleanedXorResult)) {
+        console.error('❌ XOR result is not valid Base64');
+        return null;
+      }
+
+      console.log('🔓 Bước 4 - Giải mã Base64 lần 2...');
+      let jsonString: string;
+      try {
+        jsonString = atob(cleanedXorResult);
+      } catch (error) {
+        console.error('❌ Second Base64 decode failed:', error);
+        return null;
+      }
+      
+      console.log('✅ Sau khi giải mã Base64 lần 2:', jsonString.substring(0, 100) + '...');
+
+      console.log('📋 Bước 5 - Parse JSON...');
+      let parsedData: any;
+      try {
+        parsedData = JSON.parse(jsonString);
+      } catch (error) {
+        console.error('❌ JSON parse failed:', error);
+        console.error('📄 Raw JSON string (first 200 chars):', jsonString.substring(0, 200));
+        return null;
+      }
+
+      console.log('✅ JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
+
+      if (!isLocationItemArray(parsedData)) {
+        console.error('❌ Parsed data does not match LocationItem interface');
+        console.error('📋 Sample data structure:', parsedData?.[0]);
+        return null;
+      }
+
+      console.log('🎉 Deobfuscation thành công!');
+      return parsedData;
+    } catch (error) {
+      console.error('💥 Giải mã thất bại:', error);
+      if (error instanceof Error) {
+        console.error('🏷️ Error name:', error.name);
+        console.error('💬 Error message:', error.message);
+        console.error('📍 Error stack:', error.stack);
+      }
+      return null;
     }
-  } catch (error) {
-    console.error('Error loading province detail:', error);
+  }
+
+  function isLocationItemArray(data: any): data is LocationItem[] {
+    if (!Array.isArray(data)) {
+      console.error('❌ Data is not an array');
+      return false;
+    }
+    
+    if (data.length === 0) {
+      console.warn('⚠️ Data array is empty');
+      return true; // Empty array is valid
+    }
+
+    // Check first few items
+    const sampleSize = Math.min(3, data.length);
+    for (let i = 0; i < sampleSize; i++) {
+      const item = data[i];
+      if (
+        typeof item.id !== 'number' ||
+        typeof item.matinh !== 'number' ||
+        typeof item.ma !== 'string' ||
+        typeof item.tentinh !== 'string' ||
+        typeof item.loai !== 'string' ||
+        typeof item.tenhc !== 'string' ||
+        typeof item.dientichkm2 !== 'number' ||
+        typeof item.dansonguoi !== 'string' ||
+        typeof item.trungtamhc !== 'string' ||
+        typeof item.kinhdo !== 'number' ||
+        typeof item.vido !== 'number' ||
+        typeof item.truocsapnhap !== 'string'
+      ) {
+        console.error(`❌ Item ${i} does not match LocationItem interface:`, item);
+        return false;
+      }
+    }
+    
+    console.log('✅ Data validation passed');
+    return true;
+  }
+
+  async function generateSimpleToken(timestamp: number): Promise<string> {
+    const secret = 'secretkey123'; // Phải giống với server
+    const message = timestamp + secret;
+    
+    try {
+      // Simple hash function using crypto.subtle API
+      const encoder = new TextEncoder();
+      const data = encoder.encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      return hashHex;
+    } catch (error) {
+      console.error('❌ Token generation failed:', error);
+      return '';
+    }
+  }
+
+  const loadProvinceDetail = async (province: ProvinceData) => {
+    setDetailLoading(true);
     setDetailData([]);
-    alert('Lỗi khi tải dữ liệu chi tiết. Vui lòng kiểm tra kết nối mạng.');
-  } finally {
-    setDetailLoading(false);
-  }
-};
+    setSelectedItem(null);
 
+    try {
+      if (province.has_detail) {
+        const fileName = province.short_code.toLowerCase();
+        const timestamp = Date.now();
+        
+        console.log('🚀 Generating token...');
+        const token = await generateSimpleToken(timestamp);
 
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Referer': 'https://tra-cuu-tinh-thanh.vercel.app/',
+          'Origin': 'https://tra-cuu-tinh-thanh.vercel.app'
+        };
+
+        if (token) {
+          headers['X-Token'] = token;
+          headers['X-Time'] = timestamp.toString();
+          console.log('🔑 Token generated successfully');
+        } else {
+          console.warn('⚠️ Token generation failed, proceeding without token');
+        }
+
+        console.log(`📡 Đang gọi API: /api/provinces/${fileName}`);
+        const response = await fetch(`https://json-province.vercel.app/api/provinces/${fileName}`, {
+          method: 'GET',
+          headers: headers,
+          credentials: 'omit'
+        });
+
+        console.log('📊 Response status:', response.status);
+        console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+          console.error(`❌ API error: ${response.status} - ${response.statusText}`);
+          const errorText = await response.text();
+          console.error('📄 Error response:', errorText);
+          setDetailData([]);
+          alert(`Lỗi khi tải dữ liệu từ API: ${response.status}. Vui lòng thử lại sau.`);
+          return;
+        }
+
+        const result = await response.json();
+        console.log('📦 Full API response structure:', {
+          hasStatus: !!result.status,
+          status: result.status,
+          hasPayload: !!result.payload,
+          payloadType: typeof result.payload,
+          payloadLength: result.payload?.length,
+          hasTimestamp: !!result.ts
+        });
+
+        if (result.status === 'ok' && result.payload) {
+          console.log('🔓 Đang giải mã dữ liệu...');
+          const deobfuscatedData = simpleDeobfuscate(result.payload);
+          if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
+            console.log(`🎉 Đã tải thành công ${deobfuscatedData.length} records`);
+            setDetailData(deobfuscatedData);
+          } else {
+            console.error('❌ Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
+            setDetailData([]);
+            alert('Không thể giải mã dữ liệu chi tiết. Dữ liệu có thể bị lỗi.');
+          }
+        } else if (Array.isArray(result)) {
+          console.log('📋 Sử dụng dữ liệu từ API cũ (không mã hóa)');
+          setDetailData(result);
+        } else {
+          console.error('❌ Unexpected response format:', result);
+          setDetailData([]);
+          alert('Định dạng dữ liệu từ API không hợp lệ.');
+        }
+      } else {
+        console.log('ℹ️ Province không có dữ liệu chi tiết');
+        setDetailData([]);
+      }
+    } catch (error) {
+      console.error('💥 Error loading province detail:', error);
+      setDetailData([]);
+      alert('Lỗi khi tải dữ liệu chi tiết. Vui lòng kiểm tra kết nối mạng.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const handleProvinceClick = (province: ProvinceData) => {
     if (province.has_detail && province.merger_type === "Có sáp nhập") {
@@ -397,7 +477,7 @@ const loadProvinceDetail = async (province: ProvinceData) => {
             
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-xs bg-gray-800 px-2 py-1 rounded">2025</span>
-              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.0</span>
+              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.1</span>
             </div>
           </div>
         </div>
@@ -845,7 +925,7 @@ const loadProvinceDetail = async (province: ProvinceData) => {
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-xs bg-gray-800 px-2 py-1 rounded">2025</span>
-              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.0</span>
+              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.1</span>
             </div>
           </div>
         </div>
