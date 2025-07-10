@@ -89,44 +89,26 @@ const VietnamProvincesLookup = () => {
     }
     setLoading(false);
   };
- function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
-  try {
-    console.log('Bước 1 - Payload đầu vào:', obfuscatedData?.substring(0, 100) + '...');
+ function simpleObfuscate(data: LocationItem[]): string {
+  // Convert JSON to UTF-8 encoded bytes
+  const jsonString = JSON.stringify(data);
+  const utf8Bytes = Buffer.from(jsonString, 'utf8');
 
-    if (!obfuscatedData || typeof obfuscatedData !== 'string') {
-      console.error('Invalid payload: không phải string hoặc null');
-      return null;
-    }
+  // First Base64 encoding
+  const encoded = utf8Bytes.toString('base64');
 
-    // Bước 1: Giải mã Base64 lần đầu
-    const firstDecode = atob(obfuscatedData);
-    console.log('Bước 2 - Sau khi giải mã Base64 lần 1:', firstDecode.substring(0, 100) + '...');
+  // XOR with key (byte-level operation)
+  const key = Buffer.from('secretkey123', 'utf8');
+  const encodedBytes = Buffer.from(encoded, 'utf8');
+  const obfuscatedBytes = Buffer.alloc(encodedBytes.length);
 
-    // Bước 2: Đảo ngược XOR với khóa
-    const key = 'secretkey123';
-    const deobfuscated = firstDecode.split('').map((char, index) => {
-      const keyChar = key[index % key.length];
-      return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
-    }).join('');
-    console.log('Bước 3 - Sau khi đảo ngược XOR:', deobfuscated.substring(0, 100) + '...');
-
-    // Bước 3: Giải mã Base64 lần thứ hai
-    const jsonString = atob(deobfuscated);
-    console.log('Bước 4 - Sau khi giải mã Base64 lần 2:', jsonString.substring(0, 100) + '...');
-
-    // Bước 4: Phân tích JSON
-    const parsedData = JSON.parse(jsonString);
-    console.log('Bước 5 - JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
-
-    return parsedData;
-  } catch (error) {
-    console.error('Giải mã thất bại:', error);
-    if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-    }
-    return null;
+  for (let i = 0; i < encodedBytes.length; i++) {
+    const keyByte = key[i % key.length];
+    obfuscatedBytes[i] = encodedBytes[i] ^ keyByte;
   }
+
+  // Final Base64 encoding
+  return obfuscatedBytes.toString('base64');
 }
 async function generateSimpleToken(timestamp: number): Promise<string> {
   const secret = 'secretkey123'; // Phải giống với server
@@ -206,7 +188,7 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
         console.log('Đang giải mã dữ liệu...');
         
         // Giải mã dữ liệu
-        const deobfuscatedData = simpleDeobfuscate(result.payload);
+        const deobfuscatedData = simpleObfuscate(result.payload);
         
         if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
           console.log(`Đã tải thành công ${deobfuscatedData.length} records`);
