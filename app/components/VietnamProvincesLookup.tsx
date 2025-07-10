@@ -56,14 +56,12 @@ const VietnamProvincesLookup = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'name' | 'wards' | 'merger_rate'>('name');
 
-  // Cleanup khi component unmount
   useEffect(() => {
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, []);
 
-  // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
     loadProvinces();
@@ -90,101 +88,36 @@ const VietnamProvincesLookup = () => {
     setLoading(false);
   };
 
-  function isValidBase64(str: string): boolean {
-    // Support standard and URL-safe Base64
-    if (!str || str.length === 0) return false;
-    if (str.length % 4 !== 0) return false;
-    return /^[A-Za-z0-9+/]*={0,2}$/.test(str);
-  }
-
-  function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
+  // Simple Base64 decode function
+  function simpleBase64Decode(encodedData: string): LocationItem[] | null {
     try {
-      console.log('🔍 Bước 1 - Payload đầu vào:', obfuscatedData?.substring(0, 100) + '...');
+      console.log('🔍 Bước 1 - Payload đầu vào:', encodedData?.substring(0, 100) + '...');
 
-      if (!obfuscatedData || typeof obfuscatedData !== 'string') {
+      if (!encodedData || typeof encodedData !== 'string') {
         console.error('❌ Invalid payload: không phải string hoặc null');
         return null;
       }
 
-      // Validate Base64 format
-      const cleanedPayload = obfuscatedData.replace(/[^A-Za-z0-9+/=]/g, '');
-      if (!isValidBase64(cleanedPayload)) {
-        console.error('❌ Invalid Base64 string format');
-        return null;
-      }
-
-      console.log('🔓 Bước 2 - Giải mã Base64 lần 1...');
-      let firstDecode: string;
+      console.log('🔓 Bước 2 - Giải mã Base64...');
+      let jsonString: string;
       try {
-        firstDecode = atob(cleanedPayload);
+        // Decode Base64 với proper UTF-8 handling
+        jsonString = decodeURIComponent(escape(atob(encodedData)));
       } catch (error) {
         console.error('❌ Base64 decode failed:', error);
         return null;
       }
       
-      console.log('✅ Sau khi giải mã Base64 lần 1 (length):', firstDecode.length);
+      console.log('✅ Sau khi giải mã Base64:', jsonString.substring(0, 100) + '...');
 
-      console.log('🔑 Bước 3 - Thực hiện XOR decode...');
-      const key = 'secretkey123';
-      let deobfuscated: string;
-      try {
-        deobfuscated = firstDecode.split('').map((char, index) => {
-          const keyChar = key[index % key.length];
-          return String.fromCharCode(char.charCodeAt(0) ^ keyChar.charCodeAt(0));
-        }).join('');
-      } catch (error) {
-        console.error('❌ XOR decode failed:', error);
-        return null;
-      }
-      
-      console.log('✅ Sau khi XOR decode:', deobfuscated.substring(0, 50) + '...');
-
-      // Clean XOR result more thoroughly
-      const cleanedXorResult = deobfuscated.replace(/[^A-Za-z0-9+/=]/g, '');
-      if (!isValidBase64(cleanedXorResult)) {
-        console.error('❌ XOR result is not valid Base64');
-        console.error('🔍 XOR result sample:', deobfuscated.substring(0, 100));
-        return null;
-      }
-
-      console.log('🔓 Bước 4 - Giải mã Base64 lần 2...');
-      let jsonString: string;
-      try {
-        const binaryString = atob(cleanedXorResult);
-        
-        // Convert binary string to proper UTF-8
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        
-        // Use TextDecoder for proper UTF-8 handling
-        const decoder = new TextDecoder('utf-8');
-        jsonString = decoder.decode(bytes);
-      } catch (error) {
-        console.error('❌ Second Base64 decode failed:', error);
-        return null;
-      }
-      
-      console.log('✅ Sau khi giải mã Base64 lần 2:', jsonString.substring(0, 100) + '...');
-
-      console.log('📋 Bước 5 - Parse JSON...');
+      console.log('📋 Bước 3 - Parse JSON...');
       let parsedData: any;
       try {
         parsedData = JSON.parse(jsonString);
       } catch (error) {
         console.error('❌ JSON parse failed:', error);
         console.error('📄 Raw JSON string (first 200 chars):', jsonString.substring(0, 200));
-        
-        // Try to fix common Unicode issues
-        try {
-          const fixedJsonString = jsonString.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
-          parsedData = JSON.parse(fixedJsonString);
-          console.log('🔧 Fixed JSON with character cleanup');
-        } catch (fixError) {
-          console.error('❌ Even fixed JSON parse failed:', fixError.message);
-          return null;
-        }
+        return null;
       }
 
       console.log('✅ JSON đã phân tích:', Array.isArray(parsedData) ? `Array với ${parsedData.length} items` : typeof parsedData);
@@ -195,14 +128,13 @@ const VietnamProvincesLookup = () => {
         return null;
       }
 
-      console.log('🎉 Deobfuscation thành công!');
+      console.log('🎉 Decode thành công!');
       return parsedData;
     } catch (error) {
       console.error('💥 Giải mã thất bại:', error);
       if (error instanceof Error) {
         console.error('🏷️ Error name:', error.name);
         console.error('💬 Error message:', error.message);
-        console.error('📍 Error stack:', error.stack);
       }
       return null;
     }
@@ -216,7 +148,7 @@ const VietnamProvincesLookup = () => {
     
     if (data.length === 0) {
       console.warn('⚠️ Data array is empty');
-      return true; // Empty array is valid
+      return true;
     }
 
     // Check first few items
@@ -247,11 +179,10 @@ const VietnamProvincesLookup = () => {
   }
 
   async function generateSimpleToken(timestamp: number): Promise<string> {
-    const secret = 'secretkey123'; // Phải giống với server
+    const secret = 'secretkey123';
     const message = timestamp + secret;
     
     try {
-      // Simple hash function using crypto.subtle API
       const encoder = new TextEncoder();
       const data = encoder.encode(message);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -300,7 +231,6 @@ const VietnamProvincesLookup = () => {
         });
 
         console.log('📊 Response status:', response.status);
-        console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           console.error(`❌ API error: ${response.status} - ${response.statusText}`);
@@ -312,23 +242,22 @@ const VietnamProvincesLookup = () => {
         }
 
         const result = await response.json();
-        console.log('📦 Full API response structure:', {
+        console.log('📦 API response structure:', {
           hasStatus: !!result.status,
           status: result.status,
           hasPayload: !!result.payload,
           payloadType: typeof result.payload,
-          payloadLength: result.payload?.length,
-          hasTimestamp: !!result.ts
+          payloadLength: result.payload?.length
         });
 
         if (result.status === 'ok' && result.payload) {
           console.log('🔓 Đang giải mã dữ liệu...');
-          const deobfuscatedData = simpleDeobfuscate(result.payload);
-          if (deobfuscatedData && Array.isArray(deobfuscatedData)) {
-            console.log(`🎉 Đã tải thành công ${deobfuscatedData.length} records`);
-            setDetailData(deobfuscatedData);
+          const decodedData = simpleBase64Decode(result.payload);
+          if (decodedData && Array.isArray(decodedData)) {
+            console.log(`🎉 Đã tải thành công ${decodedData.length} records`);
+            setDetailData(decodedData);
           } else {
-            console.error('❌ Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
+            console.error('❌ Failed to decode data');
             setDetailData([]);
             alert('Không thể giải mã dữ liệu chi tiết. Dữ liệu có thể bị lỗi.');
           }
@@ -481,7 +410,7 @@ const VietnamProvincesLookup = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Compact Header */}
+      {/* Header */}
       <div className="bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -499,14 +428,14 @@ const VietnamProvincesLookup = () => {
             
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-xs bg-gray-800 px-2 py-1 rounded">2025</span>
-              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.2</span>
+              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v3.0</span>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {/* Simplified Statistics Cards */}
+        {/* Statistics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 mb-4">
           {[
             { icon: Building, label: 'Tỉnh thành', value: stats.totalProvinces, color: 'blue' },
@@ -526,7 +455,7 @@ const VietnamProvincesLookup = () => {
           ))}
         </div>
 
-        {/* Simplified Search and Filter Controls */}
+        {/* Search and Filter Controls */}
         <div className="bg-white rounded-xl p-3 mb-4 shadow-sm border border-gray-200">
           <div className="flex flex-col space-y-3">
             {/* Search */}
@@ -590,7 +519,7 @@ const VietnamProvincesLookup = () => {
           </div>
         </div>
 
-        {/* Simplified Province Cards */}
+        {/* Province Cards */}
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {filteredProvinces.map((province) => (
@@ -603,7 +532,6 @@ const VietnamProvincesLookup = () => {
                 }`}
                 onClick={() => handleProvinceClick(province)}
               >
-                {/* Header */}
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-semibold text-gray-900 text-sm leading-tight flex-1 mr-2">
                     {province.name.replace("Thành phố ", "TP ").replace("Tỉnh ", "")}
@@ -618,7 +546,6 @@ const VietnamProvincesLookup = () => {
                   {province.administrative_center}
                 </p>
 
-                {/* Stats */}
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <div className="text-center py-1">
                     <div className="text-sm font-bold text-gray-900">{province.ward_count}</div>
@@ -636,7 +563,6 @@ const VietnamProvincesLookup = () => {
                   </div>
                 </div>
 
-                {/* Badges */}
                 <div className="flex flex-wrap gap-1 mb-2">
                   {province.place_type === "Thành phố Trung Ương" && (
                     <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-medium">
@@ -657,7 +583,6 @@ const VietnamProvincesLookup = () => {
                   )}
                 </div>
 
-                {/* Action */}
                 {province.has_detail && province.merger_type === "Có sáp nhập" ? (
                   <div className="flex items-center justify-between text-blue-600 text-xs font-medium pt-1 border-t border-gray-100">
                     <span>Xem chi tiết</span>
@@ -674,7 +599,6 @@ const VietnamProvincesLookup = () => {
             ))}
           </div>
         ) : (
-          // Simplified List View
           <div className="space-y-3">
             {filteredProvinces.map((province) => (
               <div
@@ -752,7 +676,7 @@ const VietnamProvincesLookup = () => {
         )}
       </div>
 
-      {/* Compact Modal */}
+      {/* Modal */}
       {showModal && selectedProvince && (
         <div 
           className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50" 
@@ -762,7 +686,7 @@ const VietnamProvincesLookup = () => {
             className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Compact Modal Header */}
+            {/* Modal Header */}
             <div className="bg-gray-900 text-white p-3 flex justify-between items-center">
               <div className="flex items-center space-x-2">
                 <Globe className="h-5 w-5 text-white" />
@@ -781,9 +705,9 @@ const VietnamProvincesLookup = () => {
               </button>
             </div>
 
-            {/* Compact Modal Content */}
+            {/* Modal Content */}
             <div className="flex-1 p-3 overflow-hidden flex flex-col bg-gray-50">
-              {/* Compact Province Info */}
+              {/* Province Info */}
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {[
                   { icon: Building, label: 'Trung tâm', value: selectedProvince.administrative_center },
@@ -799,7 +723,7 @@ const VietnamProvincesLookup = () => {
                 ))}
               </div>
 
-              {/* Compact Merged Provinces */}
+              {/* Merged Provinces */}
               {selectedProvince.merged_provinces && selectedProvince.merged_provinces.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mb-3">
                   <div className="text-xs text-yellow-800 font-semibold mb-1">
@@ -815,7 +739,7 @@ const VietnamProvincesLookup = () => {
                 </div>
               )}
 
-              {/* Compact Detail Data */}
+              {/* Detail Data */}
               {selectedProvince.has_detail ? (
                 detailLoading ? (
                   <div className="flex-1 flex items-center justify-center">
@@ -826,7 +750,7 @@ const VietnamProvincesLookup = () => {
                   </div>
                 ) : detailData.length > 0 ? (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Compact Search */}
+                    {/* Search */}
                     <div className="flex gap-2 mb-2">
                       <div className="flex-1 relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
@@ -850,9 +774,9 @@ const VietnamProvincesLookup = () => {
                       </select>
                     </div>
 
-                    {/* Compact Content */}
+                    {/* Content */}
                     <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-2">
-                      {/* Compact List */}
+                      {/* List */}
                       <div className="lg:col-span-2 bg-white border border-gray-200 rounded flex flex-col min-h-0">
                         <div className="bg-gray-50 p-2 border-b border-gray-200 text-xs font-semibold text-gray-800">
                           Danh sách ({filteredDetailData.length})
@@ -877,7 +801,7 @@ const VietnamProvincesLookup = () => {
                         </div>
                       </div>
 
-                      {/* Compact Detail Panel */}
+                      {/* Detail Panel */}
                       <div className="bg-white border border-gray-200 rounded p-2">
                         <div className="text-xs font-semibold text-gray-800 mb-2">Chi tiết</div>
                         {selectedItem ? (
@@ -937,7 +861,7 @@ const VietnamProvincesLookup = () => {
         </div>
       )}
 
-      {/* Compact Footer */}
+      {/* Footer */}
       <footer className="bg-gray-900 mt-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -947,7 +871,7 @@ const VietnamProvincesLookup = () => {
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-gray-300 text-xs bg-gray-800 px-2 py-1 rounded">2025</span>
-              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v2.2</span>
+              <span className="text-green-300 text-xs bg-green-900/30 px-2 py-1 rounded">v3.0</span>
             </div>
           </div>
         </div>
@@ -955,5 +879,3 @@ const VietnamProvincesLookup = () => {
     </div>
   );
 };
-
-export default VietnamProvincesLookup;
