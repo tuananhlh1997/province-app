@@ -90,7 +90,8 @@ const VietnamProvincesLookup = () => {
     setLoading(false);
   };
   function isValidBase64(str: string): boolean {
-  return /^[A-Za-z0-9+/=]+$/.test(str);
+  // Support standard and URL-safe Base64
+  return /^[A-Za-z0-9+/\-_=]+$/.test(str);
 }
  function simpleDeobfuscate(obfuscatedData: string): LocationItem[] | null {
   try {
@@ -173,7 +174,7 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
   
   return hashHex;
 }
- const loadProvinceDetail = async (province: ProvinceData) => {
+const loadProvinceDetail = async (province: ProvinceData) => {
   setDetailLoading(true);
   setDetailData([]);
   setSelectedItem(null);
@@ -208,11 +209,13 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
       if (!response.ok) {
         console.error(`API error: ${response.status} - ${response.statusText}`);
         setDetailData([]);
+        alert('Lỗi khi tải dữ liệu từ API. Vui lòng thử lại sau.');
         return;
       }
 
       const result = await response.json();
       console.log('Full API response:', result);
+      console.log('API payload:', result.payload?.substring(0, 200) + '...');
 
       if (result.status === 'ok' && result.payload) {
         console.log('Đang giải mã dữ liệu...');
@@ -223,9 +226,7 @@ async function generateSimpleToken(timestamp: number): Promise<string> {
         } else {
           console.error('Failed to deobfuscate data hoặc dữ liệu không hợp lệ');
           setDetailData([]);
-
-          // Display user-friendly error in UI
-          alert('Không thể tải dữ liệu chi tiết. Vui lòng thử lại sau.');
+          alert('Không thể giải mã dữ liệu chi tiết. Vui lòng thử lại sau.');
         }
       } else if (Array.isArray(result)) {
         console.log('Sử dụng dữ liệu từ API cũ');
